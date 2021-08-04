@@ -8,9 +8,7 @@ import com.julenka.api.primitiveBank.dto.AuthResponseDTO;
 import com.julenka.api.primitiveBank.repositories.UserRepo;
 import com.julenka.api.primitiveBank.services.CurrentUserService;
 import lombok.SneakyThrows;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class UserControllerIT {
 
     @Autowired
@@ -47,7 +46,7 @@ public class UserControllerIT {
     @SneakyThrows
     private AuthResponseDTO login() {
         final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/auth.json"));
-        MvcResult loggedIn = mockMvc.perform(post("/jwt/authenticate")
+        MvcResult loggedIn = mockMvc.perform(post("/auth/authenticate")
                 .contentType(MediaType.APPLICATION_JSON).content(loginRequest))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -55,11 +54,13 @@ public class UserControllerIT {
     }
 
 
+
     @Test
     @DisplayName("User can be created")
     @SneakyThrows
     @Order(1)
     void userCanBeCreated() {
+        userRepo.deleteAll();
         String body = ResourceConverter.getString(new ClassPathResource("test.requests/createUser.json"));
         mockMvc.perform(post("/users/create")
                 .contentType(MediaType.APPLICATION_JSON)
