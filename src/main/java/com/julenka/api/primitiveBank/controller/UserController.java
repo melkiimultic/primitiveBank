@@ -8,10 +8,8 @@ import com.julenka.api.primitiveBank.services.UserService;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -32,6 +30,19 @@ public class UserController {
     @ApiOperation("Изменение информации о пользователе")
     public void changeUserInfo (@RequestBody UserInfoDTO dto){
          userService.changeUserInfo(dto);
+    }
+
+    @DeleteMapping ("/delete")
+    @ApiOperation("Удаление текущего юзера")
+    public void deleteCurrentUser(){
+        userService.deleteCurrentUser();
+    }
+
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @DeleteMapping ("/delete/{id}")
+    @ApiOperation("Удаление юзера по id")
+    public void deleteUserById(@PathVariable("id") Long id ){
+        userService.deleteUserById(id);
     }
 
 

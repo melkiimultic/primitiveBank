@@ -8,6 +8,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 
+import javax.transaction.Transactional;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -17,6 +18,7 @@ public class UserDetailsLoader implements UserDetailsService {
     private final UserRepo repo;
 
     @Override
+    @Transactional
     public User loadUserByUsername(String username) throws UsernameNotFoundException {
         Optional<User> user = repo.findOneByUsername(username);
         if(!user.isPresent()){

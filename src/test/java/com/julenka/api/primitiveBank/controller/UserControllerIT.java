@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.julenka.api.primitiveBank.ResourceConverter;
 import com.julenka.api.primitiveBank.domain.Roles;
 import com.julenka.api.primitiveBank.domain.User;
+import com.julenka.api.primitiveBank.domain.UserInfo;
 import com.julenka.api.primitiveBank.dto.AuthResponseDTO;
 import com.julenka.api.primitiveBank.repositories.UserRepo;
 import com.julenka.api.primitiveBank.services.CurrentUserService;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,10 +20,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,12 +44,11 @@ public class UserControllerIT {
     TransactionTemplate template;
     @Autowired
     CurrentUserService currentUserService;
-    @MockBean
+    @Autowired
     PasswordEncoder encoder;
 
     @SneakyThrows
-    private AuthResponseDTO login() {
-        final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/auth.json"));
+    private AuthResponseDTO login(String loginRequest) {
         MvcResult loggedIn = mockMvc.perform(post("/auth/authenticate")
                 .contentType(MediaType.APPLICATION_JSON).content(loginRequest))
                 .andExpect(status().isOk())
@@ -53,6 +56,31 @@ public class UserControllerIT {
         return new ObjectMapper().readValue(loggedIn.getResponse().getContentAsString(), AuthResponseDTO.class);
     }
 
+    private Long createAndSafeAdminUser() {
+        User user = new User();
+        user.setUsername("admin");
+        user.setAuthorities(Set.of(Roles.USER, Roles.ADMIN));
+        user.setPassword(encoder.encode("admin1"));
+        UserInfo info = new UserInfo();
+        info.setFirstName("FirstA");
+        info.setLastName("LastA");
+        user.setUserInfo(info);
+        userRepo.save(user);
+        return userRepo.findOneByUsername(user.getUsername()).get().getId();
+    }
+
+    private Long createAndSafeSimpleUser() {
+        User user = new User();
+        user.setUsername("test");
+        user.setAuthorities(Set.of(Roles.USER));
+        user.setPassword(encoder.encode("test1"));
+        UserInfo info = new UserInfo();
+        info.setFirstName("First");
+        info.setLastName("Last");
+        user.setUserInfo(info);
+        userRepo.save(user);
+        return userRepo.findOneByUsername(user.getUsername()).get().getId();
+    }
 
 
     @Test
@@ -70,7 +98,7 @@ public class UserControllerIT {
         {
             Optional<User> user = userRepo.findOneByUsername("test");
             assertTrue(user.isPresent());
-            assertEquals(encoder.encode("test1"), user.get().getPassword());
+            assertTrue(encoder.matches("test1", user.get().getPassword()));
             assertEquals("First", user.get().getUserInfo().getFirstName());
             assertEquals("Last", user.get().getUserInfo().getLastName());
             assertTrue(user.get().getAuthorities().contains(Roles.USER));
@@ -84,15 +112,51 @@ public class UserControllerIT {
     @SneakyThrows
     @Order(2)
     void changeUserInfo() {
+        final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/auth.json"));
         String body = ResourceConverter.getString(new ClassPathResource("test.requests/userInfo.json"));
         mockMvc.perform(post("/users/changeInfo")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
-                .header("Authorization", "Bearer " + login().getJwtToken()))
+                .header("Authorization", "Bearer " + login(loginRequest).getJwtToken()))
                 .andExpect(status().isOk());
-        User currentUser = currentUserService.getCurrentUser();
-        assertEquals("Second", currentUser.getUserInfo().getFirstName());
-        assertEquals("Third", currentUser.getUserInfo().getLastName());
+        template.executeWithoutResult(tr -> {
+            User user = userRepo.findOneByUsername("test").get();
+            assertEquals("Second", user.getUserInfo().getFirstName());
+            assertEquals("Third", user.getUserInfo().getLastName());
+        });
+    }
+
+    @Test
+    @DisplayName("User can be deleted")
+    @SneakyThrows
+    @Order(3)
+    void deleteUser() {
+        final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/auth.json"));
+        mockMvc.perform(delete("/users/delete")
+                .header("Authorization", "Bearer " + login(loginRequest).getJwtToken()))
+                .andExpect(status().isOk());
+        template.executeWithoutResult(tr->{
+            assertFalse(userRepo.existsByUsername("test"));
+        });
+
+    }
+
+    @Test
+    @DisplayName("User can be deleted by ID")
+    @SneakyThrows
+    @Order(4)
+    void deleteUserByIdIfCurrentIsAdmin() {
+        final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/authAdmin.json"));
+        final AtomicReference<Long> userId = new AtomicReference<>();
+        template.executeWithoutResult(e -> {
+            userId.set(createAndSafeSimpleUser());
+            createAndSafeAdminUser();
+        });
+        mockMvc.perform(delete("/users/delete/" + userId.get())
+                .header("Authorization", "Bearer " + login(loginRequest).getJwtToken()))
+                .andExpect(status().isOk());
+        assertFalse(userRepo.existsById(userId.get()));
+
 
     }
 

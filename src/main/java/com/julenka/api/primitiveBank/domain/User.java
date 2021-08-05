@@ -28,7 +28,7 @@ public class User implements UserDetails {
     @Column(name = "password")
     private String password;
 
-    @OneToOne(fetch = FetchType.LAZY,cascade = CascadeType.ALL)
+    @OneToOne(fetch = FetchType.EAGER,cascade = CascadeType.ALL)
     @JoinColumn(name = "userinfo_id")
     private UserInfo userInfo;
 
@@ -38,7 +38,7 @@ public class User implements UserDetails {
     @NotNull
     @NotEmpty
     @Enumerated(EnumType.STRING)
-    @ElementCollection(targetClass = Roles.class)
+    @ElementCollection(targetClass = Roles.class,fetch = FetchType.EAGER)
     @Column(name = "authorities")
     private Collection<Roles> authorities;
 

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.transaction.Transactional;
 import javax.validation.Valid;
 
 @RestController
@@ -30,6 +31,7 @@ public class AuthController {
 
     @ApiOperation("Получение токена")
     @PostMapping(value = "/authenticate")
+    @Transactional
     public AuthResponseDTO createAuthenticationToken(@RequestBody @Valid AuthRequestDTO authenticationRequest) throws Exception {
         authenticate(authenticationRequest.getUsername(), authenticationRequest.getPassword());
         final UserDetails userDetails = userDetailsService.loadUserByUsername(authenticationRequest.getUsername());

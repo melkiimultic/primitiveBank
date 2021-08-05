@@ -53,6 +53,19 @@ public class UserService {
 
     }
 
+    @Transactional
+    public void deleteCurrentUser(){
+        User currentUser = currentUserService.getCurrentUser();
+        userRepo.delete(currentUser);
+    }
+
+    @Transactional
+    public void deleteUserById(Long id){
+        userRepo.deleteById(id);
+    }
+
+
+
 
 
 }
