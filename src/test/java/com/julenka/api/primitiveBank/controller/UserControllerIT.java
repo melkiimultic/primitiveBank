@@ -118,10 +118,11 @@ public class UserControllerIT {
     @Order(1)
     void sameLoginUserCreation() {
         String body = ResourceConverter.getString(new ClassPathResource("test.requests/createUser.json"));
-        mockMvc.perform(post("/users/create")
+       mockMvc.perform(post("/users/create")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
                 .andExpect(status().isConflict());
+
         template.executeWithoutResult(e ->
         {
             assertTrue(userRepo.existsByUsername("test"));
