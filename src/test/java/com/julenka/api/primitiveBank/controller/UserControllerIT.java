@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -56,7 +57,8 @@ public class UserControllerIT {
         return new ObjectMapper().readValue(loggedIn.getResponse().getContentAsString(), AuthResponseDTO.class);
     }
 
-    private Long createAndSafeAdminUser() {
+    @Transactional
+    Long createAndSafeAdminUser() {
         User user = new User();
         user.setUsername("admin");
         user.setAuthorities(Set.of(Roles.USER, Roles.ADMIN));
@@ -66,10 +68,13 @@ public class UserControllerIT {
         info.setLastName("LastA");
         user.setUserInfo(info);
         userRepo.save(user);
+        template.executeWithoutResult(e -> {
+        });
         return userRepo.findOneByUsername(user.getUsername()).get().getId();
     }
 
-    private Long createAndSafeSimpleUser() {
+    @Transactional
+    Long createAndSafeSimpleUser() {
         User user = new User();
         user.setUsername("test");
         user.setAuthorities(Set.of(Roles.USER));
@@ -86,7 +91,7 @@ public class UserControllerIT {
     @Test
     @DisplayName("User can be created")
     @SneakyThrows
-    @Order(1)
+    @Order(0)
     void userCanBeCreated() {
         userRepo.deleteAll();
         String body = ResourceConverter.getString(new ClassPathResource("test.requests/createUser.json"));
@@ -103,6 +108,24 @@ public class UserControllerIT {
             assertEquals("Last", user.get().getUserInfo().getLastName());
             assertTrue(user.get().getAuthorities().contains(Roles.USER));
             assertTrue(user.get().getAccounts().size() == 0);
+        });
+
+    }
+
+    @Test
+    @DisplayName("Can't create user with the same login")
+    @SneakyThrows
+    @Order(1)
+    void sameLoginUserCreation() {
+        String body = ResourceConverter.getString(new ClassPathResource("test.requests/createUser.json"));
+        mockMvc.perform(post("/users/create")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isConflict());
+        template.executeWithoutResult(e ->
+        {
+            assertTrue(userRepo.existsByUsername("test"));
+            assertTrue(userRepo.count()==1);
         });
 
     }
@@ -127,25 +150,47 @@ public class UserControllerIT {
     }
 
     @Test
-    @DisplayName("User can be deleted")
+    @DisplayName("Userinfo isn't changed if empty request")
     @SneakyThrows
     @Order(3)
+    void emptyRequestUserInfoChange() {
+        final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/auth.json"));
+        mockMvc.perform(post("/users/changeInfo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + login(loginRequest).getJwtToken()))
+                .andExpect(status().isBadRequest());
+        template.executeWithoutResult(tr -> {
+            User user = userRepo.findOneByUsername("test").get();
+            assertEquals("Second", user.getUserInfo().getFirstName());
+            assertEquals("Third", user.getUserInfo().getLastName());
+        });
+    }
+
+    @Test
+    @DisplayName("User can be deleted")
+    @SneakyThrows
+    @Order(4)
     void deleteUser() {
+        createAndSafeAdminUser();
         final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/auth.json"));
         mockMvc.perform(delete("/users/delete")
                 .header("Authorization", "Bearer " + login(loginRequest).getJwtToken()))
                 .andExpect(status().isOk());
-        template.executeWithoutResult(tr->{
+        template.executeWithoutResult(tr -> {
             assertFalse(userRepo.existsByUsername("test"));
+            assertTrue(userRepo.existsByUsername("admin"));
         });
 
     }
 
     @Test
-    @DisplayName("User can be deleted by ID")
+    @DisplayName("User can be deleted by ID by admin")
     @SneakyThrows
-    @Order(4)
+    @Order(5)
     void deleteUserByIdIfCurrentIsAdmin() {
+        template.executeWithoutResult(e -> {
+            userRepo.deleteAll();
+        });
         final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/authAdmin.json"));
         final AtomicReference<Long> userId = new AtomicReference<>();
         template.executeWithoutResult(e -> {
@@ -157,6 +202,26 @@ public class UserControllerIT {
                 .andExpect(status().isOk());
         assertFalse(userRepo.existsById(userId.get()));
 
+    }
+
+    @Test
+    @DisplayName("User can't be deleted by ID by simple user")
+    @SneakyThrows
+    @Order(5)
+    void deleteUserByIdBySimpleUser() {
+        template.executeWithoutResult(e -> {
+            userRepo.deleteAll();
+        });
+        final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/auth.json"));
+        final AtomicReference<Long> userId = new AtomicReference<>();
+        template.executeWithoutResult(e -> {
+            createAndSafeSimpleUser();
+            userId.set(createAndSafeAdminUser());
+        });
+        mockMvc.perform(delete("/users/delete/" + userId.get())
+                .header("Authorization", "Bearer " + login(loginRequest).getJwtToken()))
+                .andExpect(status().isForbidden());
+        assertTrue(userRepo.existsById(userId.get()));
 
     }
 
