@@ -21,8 +21,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.transaction.Transactional;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -68,8 +66,6 @@ public class UserControllerIT {
         info.setLastName("LastA");
         user.setUserInfo(info);
         userRepo.save(user);
-        template.executeWithoutResult(e -> {
-        });
         return userRepo.findOneByUsername(user.getUsername()).get().getId();
     }
 

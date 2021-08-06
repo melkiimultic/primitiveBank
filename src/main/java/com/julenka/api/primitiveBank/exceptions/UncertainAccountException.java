@@ -4,9 +4,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 @ResponseStatus(code = HttpStatus.BAD_REQUEST)
-public class BadCredentialsException extends RuntimeException{
+public class UncertainAccountException extends RuntimeException{
 
-    public BadCredentialsException (String message){
+    public UncertainAccountException (String message){
         super(message);
     }
+
 }
