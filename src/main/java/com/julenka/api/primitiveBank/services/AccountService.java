@@ -1,20 +1,20 @@
 package com.julenka.api.primitiveBank.services;
 
 import com.julenka.api.primitiveBank.domain.Account;
+import com.julenka.api.primitiveBank.domain.User;
 import com.julenka.api.primitiveBank.dto.MoneyTransferDTO;
+import com.julenka.api.primitiveBank.exceptions.BadRequestException;
 import com.julenka.api.primitiveBank.exceptions.ForbiddenOperationException;
 import com.julenka.api.primitiveBank.exceptions.UncertainAccountException;
 import com.julenka.api.primitiveBank.repositories.AccountRepo;
+import com.julenka.api.primitiveBank.repositories.UserRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionOperations;
 
 import javax.transaction.Transactional;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +22,20 @@ public class AccountService {
 
     private final CurrentUserService currentUserService;
     private final AccountRepo accountRepo;
+    private final UserRepo userRepo;
+
+    @Transactional
+    public Long createAccountForCurrentUser() {
+        User currentUser = currentUserService.getCurrentUser();
+        if (!userRepo.existsByUsername(currentUser.getUsername())) {
+            throw new ForbiddenOperationException("No such user!");
+        }
+        Account account = new Account();
+        account.setBalance(BigDecimal.ZERO);
+        account.setUser(currentUser);
+        Account saved = accountRepo.saveAndFlush(account);
+        return saved.getId();
+    }
 
     @Transactional
     public void transferMoney(MoneyTransferDTO dto) {
@@ -32,6 +46,9 @@ public class AccountService {
     }
 
     private void checkFromField(MoneyTransferDTO dto) {
+        if (dto == null) {
+            throw new BadRequestException("Empty request body");
+        }
         List<Account> accounts = currentUserService.getCurrentUser().getAccounts();
         if (dto.getFromId() == null) {
             if (accounts.size() == 1) {
@@ -40,18 +57,13 @@ public class AccountService {
                 throw new UncertainAccountException("User has no or more than 1 account");
             }
         } else {
-            if (accounts.size() > 0) {
-                Optional<Long> first = accounts.stream().
-                        map(account -> account.getId()).
-                        filter(aLong -> aLong.compareTo(dto.getFromId()) == 0)
-                        .findFirst();
-                if (first.isEmpty()) {
-                    throw new UncertainAccountException("Forbidden.User has not such an account");
-                }
-            } else {
+            Optional<Long> first = accounts.stream()
+                    .map(account -> account.getId())
+                    .filter(aLong -> aLong.compareTo(dto.getFromId()) == 0)
+                    .findFirst();
+            if (first.isEmpty()) {
                 throw new UncertainAccountException("Forbidden.User has not such an account");
             }
-
         }
     }
 
