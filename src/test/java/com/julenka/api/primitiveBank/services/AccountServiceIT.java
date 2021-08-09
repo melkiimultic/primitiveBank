@@ -3,6 +3,7 @@ package com.julenka.api.primitiveBank.services;
 import com.julenka.api.primitiveBank.domain.Account;
 import com.julenka.api.primitiveBank.domain.Roles;
 import com.julenka.api.primitiveBank.domain.User;
+import com.julenka.api.primitiveBank.dto.FundDepositDTO;
 import com.julenka.api.primitiveBank.dto.MoneyTransferDTO;
 import com.julenka.api.primitiveBank.exceptions.BadRequestException;
 import com.julenka.api.primitiveBank.exceptions.ForbiddenOperationException;
@@ -21,9 +22,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.transaction.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class AccountServiceIT {
@@ -306,6 +307,201 @@ class AccountServiceIT {
             assertEquals(0, accTo.getBalance().compareTo(new BigDecimal(5)));
         });
     }
+
+    @Test
+    @DisplayName("Account can be created for current user")
+    public void createAccount() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", null);
+        Long userId = user.getId();
+        assertTrue(accountRepo.findAllByUser(user).isEmpty());
+        template.executeWithoutResult(tr -> {
+            accountService.createAccountForCurrentUser();
+            assertTrue(accountRepo.findAllByUser(user).size() == 1);
+            assertTrue(accountRepo.findAllByUser(user).get(0).isPresent());
+            Account account = accountRepo.findAllByUser(user).get(0).get();
+            assertEquals(0, account.getBalance().compareTo(BigDecimal.ZERO));
+            assertEquals(userId, account.getUser().getId());
+        });
+    }
+
+    @Test
+    @DisplayName("FundDepositDTO hasn't been passed")
+    void fundDepositDTOIsNull() {
+        assertThrows(BadRequestException.class, () -> accountService.fundDepositOfCurrentUser(null),
+                "Empty request body");
+    }
+
+    @Test
+    @DisplayName("To ID isn't defined and current user has no accounts to replenish")
+    void fundDepositWithEmptyToId1() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", null);
+        FundDepositDTO dto = new FundDepositDTO();
+        dto.setAmount(new BigDecimal(10));
+        assertThrows(UncertainAccountException.class, () -> accountService.fundDepositOfCurrentUser(dto),
+                "User has no or more than 1 account");
+        template.executeWithoutResult(tr -> {
+            assertEquals(0, accountRepo.findAllByUser(user).size());
+        });
+    }
+
+    @Test
+    @DisplayName("To ID isn't defined and current user has more than 1 account")
+    void fundDepositWithEmptyToId2() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", new BigDecimal(10));
+        template.executeWithoutResult(tr -> {
+            Account acc2 = new Account();
+            acc2.setUser(user);
+            accountRepo.saveAndFlush(acc2);
+        });
+        FundDepositDTO dto = new FundDepositDTO();
+        dto.setAmount(new BigDecimal(10));
+        assertThrows(UncertainAccountException.class, () -> accountService.fundDepositOfCurrentUser(dto),
+                "User has no or more than 1 account");
+        template.executeWithoutResult(tr -> {
+            assertEquals(2, accountRepo.findAllByUser(user).size());
+        });
+    }
+
+    @Test
+    @DisplayName("To ID isn't defined but current user has only 1 account")
+    void fundDepositWithEmptyToId3() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", new BigDecimal(10));
+        FundDepositDTO dto = new FundDepositDTO();
+        dto.setAmount(new BigDecimal(15));
+        accountService.fundDepositOfCurrentUser(dto);
+        template.executeWithoutResult(tr -> {
+            assertEquals(1, accountRepo.findAllByUser(user).size());
+            assertEquals( 0,accountRepo.findAllByUser(user).get(0).get().getBalance().compareTo(new BigDecimal(25)));
+        });
+    }
+    @Test
+    @DisplayName("To ID doesn't match any of user's accounts")
+    void fundDepositWithWrongToId() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", new BigDecimal(10));
+        FundDepositDTO dto = new FundDepositDTO();
+        dto.setAmount(new BigDecimal(15));
+        dto.setToId(4000L);
+        assertThrows(UncertainAccountException.class, () -> accountService.fundDepositOfCurrentUser(dto),
+                "Forbidden.Current user has not such an account");
+        template.executeWithoutResult(tr -> {
+            assertEquals( 0,accountRepo.findAllByUser(user).get(0).get().getBalance().compareTo(new BigDecimal(10)));
+        });
+    }
+    @Test
+    @DisplayName("To ID matches user's account")
+    void fundDepositWithRightToId() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", new BigDecimal(10));
+        FundDepositDTO dto = new FundDepositDTO();
+        dto.setAmount(new BigDecimal(15));
+        template.executeWithoutResult(tr->{
+            Long id = accountRepo.findAllByUser(user).get(0).get().getId();
+            dto.setToId(id);
+            accountService.fundDepositOfCurrentUser(dto);
+            assertEquals( 0,accountRepo.findById(id).get().getBalance().compareTo(new BigDecimal(25)));
+        });
+
+    }
+
+    @Test
+    @DisplayName("Fund deposit with negative sum")
+    void fundDepositWithNegativeSum() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", new BigDecimal(10));
+        FundDepositDTO dto = new FundDepositDTO();
+        dto.setAmount(new BigDecimal(-15));
+        assertThrows(ForbiddenOperationException.class, () -> accountService.fundDepositOfCurrentUser(dto),
+                "You can't transfer negative amount");
+        template.executeWithoutResult(tr->{
+            assertEquals( 0,accountRepo.findAllByUser(user).get(0).get().getBalance().compareTo(new BigDecimal(10)));
+        });
+
+    }
+    @Test
+    @DisplayName("Fund deposit with empty sum")
+    void fundDepositWithEmptySum() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", new BigDecimal(10));
+        FundDepositDTO dto = new FundDepositDTO();
+        assertThrows(ForbiddenOperationException.class, () -> accountService.fundDepositOfCurrentUser(dto),
+                "Request doesn't contain the amount");
+        template.executeWithoutResult(tr->{
+            assertEquals( 0,accountRepo.findAllByUser(user).get(0).get().getBalance().compareTo(new BigDecimal(10)));
+        });
+    }
+
+    @Test
+    @DisplayName("Delete account with negative id")
+    void deleteAccountWithNegativeId() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", new BigDecimal(10));
+        AtomicReference<Long> accId = new AtomicReference<>();
+        template.executeWithoutResult(tr->{
+           accId.set( accountRepo.findAllByUser(user).get(0).get().getId());
+        });
+        assertThrows(BadRequestException.class, () -> accountService.deleteAccount(-3L),
+                "Wrong id!No such account in the system");
+        template.executeWithoutResult(tr->{
+            assertEquals(1,accountRepo.findAllByUser(user).size());
+            assertEquals(accId.get(),accountRepo.findAllByUser(user).get(0).get().getId());
+        });
+    }
+
+    @Test
+    @DisplayName("Delete account with not user's id")
+    void deleteAccountWithWrongId() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", new BigDecimal(10));
+        AtomicReference<Long> accId = new AtomicReference<>();
+        template.executeWithoutResult(tr->{
+            accId.set( accountRepo.findAllByUser(user).get(0).get().getId());
+        });
+        assertThrows(ForbiddenOperationException.class, () -> accountService.deleteAccount(4000L),
+                "Forbidden.User has not such an account");
+        template.executeWithoutResult(tr->{
+            assertEquals(1,accountRepo.findAllByUser(user).size());
+            assertEquals(accId.get(),accountRepo.findAllByUser(user).get(0).get().getId());
+        });
+    }
+
+    @Test
+    @DisplayName("Delete account with positive balance")
+    void deleteAccountWithPositiveBalance() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", new BigDecimal(10));
+        AtomicReference<Long> accId = new AtomicReference<>();
+        template.executeWithoutResult(tr->{
+            accId.set( accountRepo.findAllByUser(user).get(0).get().getId());
+        });
+        assertThrows(ForbiddenOperationException.class, () -> accountService.deleteAccount(accId.get()),
+                "This account has positive balance");
+        template.executeWithoutResult(tr->{
+            assertEquals(1,accountRepo.findAllByUser(user).size());
+            assertEquals(accId.get(),accountRepo.findAllByUser(user).get(0).get().getId());
+        });
+    }
+
+    @Test
+    @DisplayName("Delete account happy path")
+    void deleteAccountHappyPath() {
+        Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());
+        User user = saveUserWithAccount("From", "From1", BigDecimal.ZERO);
+        AtomicReference<Long> accId = new AtomicReference<>();
+        template.executeWithoutResult(tr->{
+            accId.set( accountRepo.findAllByUser(user).get(0).get().getId());
+        });
+        accountService.deleteAccount(accId.get());
+        template.executeWithoutResult(tr->{
+            assertEquals(0,accountRepo.findAllByUser(user).size());
+            assertFalse(accountRepo.existsById(accId.get()));
+        });
+    }
+
 
 
 }

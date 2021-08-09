@@ -2,6 +2,7 @@ package com.julenka.api.primitiveBank.services;
 
 import com.julenka.api.primitiveBank.domain.Account;
 import com.julenka.api.primitiveBank.domain.User;
+import com.julenka.api.primitiveBank.dto.FundDepositDTO;
 import com.julenka.api.primitiveBank.dto.MoneyTransferDTO;
 import com.julenka.api.primitiveBank.exceptions.BadRequestException;
 import com.julenka.api.primitiveBank.exceptions.ForbiddenOperationException;
@@ -22,20 +23,55 @@ public class AccountService {
 
     private final CurrentUserService currentUserService;
     private final AccountRepo accountRepo;
-    private final UserRepo userRepo;
 
     @Transactional
     public Long createAccountForCurrentUser() {
         User currentUser = currentUserService.getCurrentUser();
-        if (!userRepo.existsByUsername(currentUser.getUsername())) {
-            throw new ForbiddenOperationException("No such user!");
-        }
         Account account = new Account();
         account.setBalance(BigDecimal.ZERO);
         account.setUser(currentUser);
         Account saved = accountRepo.saveAndFlush(account);
         return saved.getId();
     }
+
+    @Transactional
+    public Long fundDepositOfCurrentUser(FundDepositDTO dto) {
+        if (dto == null) {
+            throw new BadRequestException("Empty request body");
+        }
+        checkAmountToFund(dto);
+
+        List<Account> accounts = currentUserService.getCurrentUser().getAccounts();
+        if (dto.getToId() == null) {
+            if (accounts.size() != 1) {
+                throw new UncertainAccountException("User has no or more than 1 account");
+            } else {
+                dto.setToId(accounts.get(0).getId());
+            }
+        } else {
+            Optional<Long> first = accounts.stream()
+                    .map(Account::getId)
+                    .filter(aLong -> aLong.equals(dto.getToId()))
+                    .findFirst();
+            if (first.isEmpty()) {
+                throw new UncertainAccountException("Forbidden.Current user has not such an account");
+            }
+        }
+        Account account = accounts.get(0);
+        account.setBalance(account.getBalance().add(dto.getAmount()));
+        Account savedAcc = accountRepo.saveAndFlush(account);
+        return savedAcc.getId();
+    }
+
+    private void checkAmountToFund(FundDepositDTO dto) {
+        if (dto.getAmount() == null) {
+            throw new ForbiddenOperationException("Request doesn't contain the amount");
+        }
+        if (dto.getAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ForbiddenOperationException("You can't transfer negative amount");
+        }
+    }
+
 
     @Transactional
     public void transferMoney(MoneyTransferDTO dto) {
@@ -58,8 +94,8 @@ public class AccountService {
             }
         } else {
             Optional<Long> first = accounts.stream()
-                    .map(account -> account.getId())
-                    .filter(aLong -> aLong.compareTo(dto.getFromId()) == 0)
+                    .map(Account::getId)
+                    .filter(aLong -> aLong.equals(dto.getFromId()))
                     .findFirst();
             if (first.isEmpty()) {
                 throw new UncertainAccountException("Forbidden.User has not such an account");
@@ -101,6 +137,24 @@ public class AccountService {
         to.setBalance(to.getBalance().add(amount));
         accountRepo.saveAndFlush(from);
         accountRepo.saveAndFlush(to);
+    }
 
+    @Transactional
+    public void deleteAccount(Long id) {
+        if (id < 0) {
+            throw new BadRequestException("Wrong id!No such account in the system");
+        }
+        List<Account> accounts = currentUserService.getCurrentUser().getAccounts();
+        Optional<Long> first = accounts.stream()
+                .map(Account::getId)
+                .filter(aLong -> aLong.equals(id))
+                .findFirst();
+        if (first.isEmpty()) {
+            throw new ForbiddenOperationException("Forbidden.User has not such an account");
+        }
+        if (accountRepo.findById(id).get().getBalance().compareTo(BigDecimal.ZERO) > 0) {
+            throw new ForbiddenOperationException("This account has positive balance");
+        }
+        accountRepo.deleteById(id);
     }
 }
