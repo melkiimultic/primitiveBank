@@ -2,7 +2,6 @@ package com.julenka.api.primitiveBank.domain;
 
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import javax.persistence.*;
 import javax.validation.constraints.NotNull;

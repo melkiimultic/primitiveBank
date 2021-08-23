@@ -10,9 +10,7 @@ import com.julenka.api.primitiveBank.exceptions.ForbiddenOperationException;
 import com.julenka.api.primitiveBank.exceptions.UncertainAccountException;
 import com.julenka.api.primitiveBank.repositories.AccountRepo;
 import com.julenka.api.primitiveBank.repositories.UserRepo;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -59,7 +57,9 @@ class AccountServiceIT {
         return userRepo.findOneByUsername(username).get();
     }
 
-    @BeforeEach
+
+
+    @AfterEach
     @Transactional
     void deleteAllUsers() {
         userRepo.deleteAll();
@@ -67,7 +67,9 @@ class AccountServiceIT {
 
     @Test
     @DisplayName("Money can be transferred if dto is valid")
+    @Order(0)
     void transferMoneyWithValidDTO() {
+        userRepo.deleteAll();
         User from = saveUserWithAccount("From", "From1", new BigDecimal(20));
         User to = saveUserWithAccount("To", "To1", new BigDecimal(5));
         Mockito.when(currentUserService.getCurrentUser()).thenAnswer((i) -> userRepo.findOneByUsername("From").get());

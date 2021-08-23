@@ -2,6 +2,7 @@ package com.julenka.api.primitiveBank.domain;
 
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.annotations.Cascade;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import javax.persistence.*;

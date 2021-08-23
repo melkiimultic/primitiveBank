@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -17,6 +18,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -58,10 +60,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         http.csrf().disable()
                 .cors()
                 // dont authenticate this particular requests
-                .and().authorizeRequests().antMatchers(noAuth()).permitAll()
+//                .and().authorizeRequests().antMatchers(noAuth()).permitAll()
                 // all other requests need to be authenticated
-                .anyRequest().authenticated()
-                .and().exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                .and().authorizeRequests().anyRequest().anonymous()
+//                .anyRequest().authenticated()
+//                .and().exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 // make sure we use stateless session; session won't be used to store user's state.
                 .and().sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
 
@@ -95,9 +98,24 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     private static String[] noAuth() {
         return new String[]{
                 "/users/create",      //создать нового юзера
-                "/auth/authenticate" //аутентификация
+                "/auth/authenticate", //аутентификация
+                "/swagger-ui.html"
         };
 
+    }
+
+    /**
+     * base auth for swagger and stuff is granted by StupidGuardingFilter
+     * todo: '/swagger-resources/**' and '/webjars/**' are pretty wide wildcards. Do they really need to be so wide?
+     *
+     * @see StupidGuardingFilter
+     */
+    @Override
+    public void configure(WebSecurity web) {
+        List<String> patterns = new ArrayList<>(StupidGuardingFilter.SWAGGER_URLS);
+        patterns.add("/swagger-resources/**");
+        patterns.add("/webjars/**");
+        web.ignoring().antMatchers(patterns.toArray(new String[0]));
     }
 
 }
