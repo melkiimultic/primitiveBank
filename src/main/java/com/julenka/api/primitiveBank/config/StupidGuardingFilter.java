@@ -19,7 +19,10 @@ public class StupidGuardingFilter extends OncePerRequestFilter {
     public static final String SWAGGER_PASSWORD = "swaggertest1";
 
     public static final String HEADER_VALUE = Base64.getEncoder().encodeToString(String.format("%s:%s", SWAGGER_USER, SWAGGER_PASSWORD).getBytes());
-    public static final List<String> SWAGGER_URLS = List.of("/swagger-ui.html", "/v2/api-docs", "/configuration/security", "/configuration/ui");
+    public static final List<String> SWAGGER_URLS = List.of(
+            "/v3/api-docs",
+            "/documentation/swagger-resources",
+            "/documentation/swagger-resources/**");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)

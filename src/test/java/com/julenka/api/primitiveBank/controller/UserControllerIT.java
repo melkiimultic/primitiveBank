@@ -55,7 +55,7 @@ public class UserControllerIT {
         return new ObjectMapper().readValue(loggedIn.getResponse().getContentAsString(), AuthResponseDTO.class);
     }
 
-    @Transactional
+
     Long createAndSafeAdminUser() {
         User user = new User();
         user.setUsername("admin");
@@ -69,7 +69,7 @@ public class UserControllerIT {
         return userRepo.findOneByUsername(user.getUsername()).get().getId();
     }
 
-    @Transactional
+
     Long createAndSafeSimpleUser() {
         User user = new User();
         user.setUsername("test");
@@ -168,7 +168,9 @@ public class UserControllerIT {
     @SneakyThrows
     @Order(4)
     void deleteUser() {
-        createAndSafeAdminUser();
+        template.executeWithoutResult(tr->{
+            createAndSafeAdminUser();
+        });
         final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/auth.json"));
         mockMvc.perform(delete("/users/delete")
                 .header("Authorization", "Bearer " + login(loginRequest).getJwtToken()))

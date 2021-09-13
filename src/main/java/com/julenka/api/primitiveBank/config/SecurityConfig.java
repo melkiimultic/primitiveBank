@@ -18,9 +18,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+
+import static com.julenka.api.primitiveBank.config.StupidGuardingFilter.SWAGGER_URLS;
 
 @Configuration
 @EnableGlobalMethodSecurity(prePostEnabled = true)
@@ -45,6 +46,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     public AuthenticationManager authenticationManagerBean() throws Exception {
         return super.authenticationManagerBean();
     }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -60,11 +62,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         http.csrf().disable()
                 .cors()
                 // dont authenticate this particular requests
-//                .and().authorizeRequests().antMatchers(noAuth()).permitAll()
+                .and().authorizeRequests().antMatchers(noAuth()).permitAll()
                 // all other requests need to be authenticated
-                .and().authorizeRequests().anyRequest().anonymous()
-//                .anyRequest().authenticated()
-//                .and().exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                .anyRequest().authenticated()
+                .and().exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 // make sure we use stateless session; session won't be used to store user's state.
                 .and().sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
 
@@ -99,23 +100,19 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         return new String[]{
                 "/users/create",      //создать нового юзера
                 "/auth/authenticate", //аутентификация
-                "/swagger-ui.html"
+                "/documentation/swagger-ui/**"
         };
 
     }
 
     /**
      * base auth for swagger and stuff is granted by StupidGuardingFilter
-     * todo: '/swagger-resources/**' and '/webjars/**' are pretty wide wildcards. Do they really need to be so wide?
      *
      * @see StupidGuardingFilter
      */
     @Override
     public void configure(WebSecurity web) {
-        List<String> patterns = new ArrayList<>(StupidGuardingFilter.SWAGGER_URLS);
-        patterns.add("/swagger-resources/**");
-        patterns.add("/webjars/**");
-        web.ignoring().antMatchers(patterns.toArray(new String[0]));
+        web.ignoring().antMatchers(SWAGGER_URLS.toArray(new String[0]));
     }
 
 }
