@@ -26,6 +26,7 @@ import static com.julenka.api.primitiveBank.config.StupidGuardingFilter.SWAGGER_
 @Configuration
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
     @Autowired
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
@@ -39,7 +40,6 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     public StupidGuardingFilter guardingFilter() {
         return new StupidGuardingFilter();
     }
-
 
     @Bean
     @Override

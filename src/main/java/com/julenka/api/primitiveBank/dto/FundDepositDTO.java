@@ -13,8 +13,10 @@ import java.math.BigDecimal;
 @RequiredArgsConstructor
 @ApiModel("Пополнение счёта")
 public class FundDepositDTO {
+
     @ApiModelProperty("ID счёта")
     private Long toId;
+
     @NotNull
     @NotEmpty
     @ApiModelProperty("Сумма пополнения")

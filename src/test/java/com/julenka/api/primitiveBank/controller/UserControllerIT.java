@@ -20,7 +20,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import javax.transaction.Transactional;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -37,12 +36,16 @@ public class UserControllerIT {
 
     @Autowired
     private MockMvc mockMvc;
+
     @Autowired
     private UserRepo userRepo;
+
     @Autowired
     TransactionTemplate template;
+
     @Autowired
     CurrentUserService currentUserService;
+
     @Autowired
     PasswordEncoder encoder;
 

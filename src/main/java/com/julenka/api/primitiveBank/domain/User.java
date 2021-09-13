@@ -2,7 +2,6 @@ package com.julenka.api.primitiveBank.domain;
 
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.annotations.Cascade;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import javax.persistence.*;
@@ -14,9 +13,10 @@ import java.util.List;
 
 @Data
 @Entity
-@Table(name="users")
+@Table(name = "users")
 @RequiredArgsConstructor
 public class User implements UserDetails {
+
     @Id
     @GeneratedValue()
     private Long id;
@@ -29,20 +29,19 @@ public class User implements UserDetails {
     @Column(name = "password")
     private String password;
 
-    @OneToOne(fetch = FetchType.EAGER,cascade = CascadeType.ALL)
+    @OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(name = "userinfo_id")
     private UserInfo userInfo;
 
-    @OneToMany (fetch = FetchType.LAZY,mappedBy = "user",cascade = CascadeType.REMOVE)
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "user", cascade = CascadeType.REMOVE)
     private List<Account> accounts;
 
     @NotNull
     @NotEmpty
     @Enumerated(EnumType.STRING)
-    @ElementCollection(targetClass = Roles.class,fetch = FetchType.EAGER)
+    @ElementCollection(targetClass = Roles.class, fetch = FetchType.EAGER)
     @Column(name = "authorities")
     private Collection<Roles> authorities;
-
 
     @Override
     public boolean isAccountNonExpired() {

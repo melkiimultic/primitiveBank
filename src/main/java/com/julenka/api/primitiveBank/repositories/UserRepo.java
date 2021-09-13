@@ -4,7 +4,6 @@ import com.julenka.api.primitiveBank.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-
 import javax.transaction.Transactional;
 import java.util.Optional;
 
@@ -12,7 +11,7 @@ import java.util.Optional;
 @Transactional
 public interface UserRepo extends JpaRepository<User, Long> {
 
-   Optional<User> findOneByUsername(String username);
+    Optional<User> findOneByUsername(String username);
 
-   boolean existsByUsername(String username);
+    boolean existsByUsername(String username);
 }

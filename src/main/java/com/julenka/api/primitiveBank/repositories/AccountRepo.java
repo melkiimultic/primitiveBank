@@ -15,6 +15,4 @@ public interface AccountRepo extends JpaRepository<Account, Long> {
 
     List<Optional<Account>> findAllByUser(User user);
 
-
-
 }

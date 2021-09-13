@@ -18,10 +18,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class UserRepoTest {
+
     @Autowired
     UserRepo userRepo;
+
     @Autowired
     PasswordEncoder encoder;
+
     @Autowired
     TransactionTemplate template;
 
@@ -72,11 +75,10 @@ class UserRepoTest {
             assertFalse(userRepo.existsByUsername("test"));
             assertFalse(userRepo.findOneByUsername("test").isPresent());
             assertFalse(userRepo.existsById(id));
-            assertTrue(userRepo.count()==0);
+            assertTrue(userRepo.count() == 0);
 
         });
     }
-
 
 
 }

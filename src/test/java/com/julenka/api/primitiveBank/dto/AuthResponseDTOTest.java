@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class AuthResponseDTOTest {
 
@@ -18,6 +18,5 @@ class AuthResponseDTOTest {
         AuthResponseDTO roundtrip = mapper.readValue(mapper.writeValueAsString(dto), AuthResponseDTO.class);
         assertEquals(dto, roundtrip);
     }
-
 
 }

@@ -1,7 +1,6 @@
 package com.julenka.api.primitiveBank;
 
 import org.springframework.core.io.Resource;
-import org.springframework.stereotype.Service;
 import org.springframework.util.FileCopyUtils;
 
 import java.io.IOException;
@@ -14,7 +13,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class ResourceConverter {
 
-    public static String getString (Resource resource){
+    public static String getString(Resource resource) {
         try (Reader reader = new InputStreamReader(resource.getInputStream(), UTF_8)) {
             return FileCopyUtils.copyToString(reader);
         } catch (IOException e) {

@@ -23,13 +23,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import javax.sql.DataSource;
 import javax.transaction.Transactional;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,12 +39,16 @@ class AccountsControllerIT {
 
     @Autowired
     private MockMvc mockMvc;
+
     @Autowired
     private UserRepo userRepo;
+
     @Autowired
     private AccountRepo accounts;
+
     @Autowired
     TransactionTemplate template;
+
     @Autowired
     PasswordEncoder encoder;
 
@@ -72,18 +76,15 @@ class AccountsControllerIT {
 
     @AfterEach
     @Transactional
-    public void deleteUsers(){
+    public void deleteUsers() {
         userRepo.deleteAll();
     }
-
-    @Autowired
-    private DataSource dataSource;
 
     @Test
     @SneakyThrows
     @DisplayName("Create account for current user happy path")
-    public void createAccountForCurrentUser(){
-        template.executeWithoutResult(tr->{
+    public void createAccountForCurrentUser() {
+        template.executeWithoutResult(tr -> {
             userRepo.deleteAll();
             createAndSafeSimpleUser();
         });
@@ -92,35 +93,34 @@ class AccountsControllerIT {
                 .header("Authorization", "Bearer " + login(loginRequest).getJwtToken()))
                 .andExpect(status().isOk());
 
-        template.executeWithoutResult(tr->{
+        template.executeWithoutResult(tr -> {
             User test = userRepo.findOneByUsername("test").get();
             Optional<Account> account = accounts.findAllByUser(test).get(0);
             assertTrue(account.isPresent());
             assertEquals(1, accounts.findAllByUser(test).size());
             assertEquals(new BigDecimal("0.00"), account.get().getBalance());
-            assertEquals("test",account.get().getUser().getUsername());
+            assertEquals("test", account.get().getUser().getUsername());
         });
 
     }
+
     @Test
     @SneakyThrows
     @DisplayName("Create account if header doesn't contain user")
-    public void createAccountWithoutCurrentUser(){
-        template.executeWithoutResult(tr->{
+    public void createAccountWithoutCurrentUser() {
+        template.executeWithoutResult(tr -> {
             userRepo.deleteAll();
             createAndSafeSimpleUser();
         });
         mockMvc.perform(post("/accounts/create"))
                 .andExpect(status().isUnauthorized());
 
-        template.executeWithoutResult(tr->{
+        template.executeWithoutResult(tr -> {
             User test = userRepo.findOneByUsername("test").get();
             assertEquals(0, accounts.findAllByUser(test).size());
         });
 
     }
-
-
 
 
 }

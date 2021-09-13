@@ -8,7 +8,6 @@ import com.julenka.api.primitiveBank.exceptions.BadRequestException;
 import com.julenka.api.primitiveBank.exceptions.ForbiddenOperationException;
 import com.julenka.api.primitiveBank.exceptions.UncertainAccountException;
 import com.julenka.api.primitiveBank.repositories.AccountRepo;
-import com.julenka.api.primitiveBank.repositories.UserRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

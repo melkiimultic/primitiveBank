@@ -23,8 +23,9 @@ import javax.validation.Valid;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/auth")
-@Tag(name = "", description = "Аутентификация пользователя")
+@Tag(name = "auth-controller", description = "Аутентификация пользователя")
 public class AuthController {
+
     private final AuthenticationManager authenticationManager;
     private final JwtTokenUtils jwtTokenUtil;
     private final UserDetailsLoader userDetailsService;
@@ -50,7 +51,6 @@ public class AuthController {
         }
 
     }
-
 
 
 }

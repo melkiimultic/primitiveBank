@@ -4,6 +4,7 @@ import com.julenka.api.primitiveBank.domain.Roles;
 import com.julenka.api.primitiveBank.domain.User;
 import com.julenka.api.primitiveBank.domain.UserInfo;
 import com.julenka.api.primitiveBank.dto.CreateUserDTO;
+import com.julenka.api.primitiveBank.dto.GetUserDTO;
 import com.julenka.api.primitiveBank.dto.UserInfoDTO;
 import com.julenka.api.primitiveBank.exceptions.EntityAlreadyExistsException;
 import com.julenka.api.primitiveBank.mappers.UserInfoMapper;
@@ -12,8 +13,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import javax.persistence.EntityNotFoundException;
 import javax.transaction.Transactional;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +26,6 @@ public class UserService {
     private final PasswordEncoder encoder;
     private final CurrentUserService currentUserService;
     private final UserInfoMapper userInfoMapper;
-
 
     @Transactional
     public Long createUser(CreateUserDTO createUserDTO) {
@@ -46,7 +48,7 @@ public class UserService {
     }
 
     @Transactional
-    public void changeUserInfo( UserInfoDTO userInfoDTO){
+    public void changeUserInfo(UserInfoDTO userInfoDTO) {
         User currentUser = currentUserService.getCurrentUser();
         currentUser.setUserInfo(userInfoMapper.toUserInfo(userInfoDTO));
         userRepo.save(currentUser);
@@ -54,18 +56,30 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteCurrentUser(){
+    public void deleteCurrentUser() {
         User currentUser = currentUserService.getCurrentUser();
         userRepo.delete(currentUser);
     }
 
     @Transactional
-    public void deleteUserById(Long id){
+    public void deleteUserById(Long id) {
         userRepo.deleteById(id);
     }
 
-
-
+    @Transactional
+    public GetUserDTO getUserByUsername(String username) {
+        GetUserDTO getUserDTO = new GetUserDTO();
+        Optional<User> userOptional = userRepo.findOneByUsername(username);
+        if (!userOptional.isPresent()) {
+            throw new EntityNotFoundException();
+        }
+        User user = userOptional.get();
+        getUserDTO.setUsername(user.getUsername());
+        getUserDTO.setId(user.getId());
+        getUserDTO.setUserinfo(userInfoMapper.fromUserInfo(user.getUserInfo()));
+        getUserDTO.setAuthorities(user.getAuthorities());
+        return getUserDTO;
+    }
 
 
 }

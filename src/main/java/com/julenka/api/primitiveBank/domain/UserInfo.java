@@ -7,8 +7,9 @@ import javax.validation.constraints.NotNull;
 
 @Data
 @Entity
-@Table(name="userinfo")
+@Table(name = "userinfo")
 public class UserInfo {
+
     @Id
     @GeneratedValue
     private Long id;

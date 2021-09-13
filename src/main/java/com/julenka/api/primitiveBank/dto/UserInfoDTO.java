@@ -10,10 +10,12 @@ import javax.validation.constraints.NotNull;
 @Data
 @ApiModel("Информация о пользователе")
 public class UserInfoDTO {
+
     @NotNull
     @NotEmpty
     @ApiModelProperty("Имя")
     private String firstName;
+
     @NotNull
     @NotEmpty
     @ApiModelProperty("Фамилия")

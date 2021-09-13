@@ -13,8 +13,12 @@ import java.util.List;
 
 import static com.julenka.api.primitiveBank.config.SecurityConfig.inWhitelist;
 
+/**
+ * Авторизует доступ к сваггеру
+ */
 @RequiredArgsConstructor
 public class StupidGuardingFilter extends OncePerRequestFilter {
+
     public static final String SWAGGER_USER = "swaggertest";
     public static final String SWAGGER_PASSWORD = "swaggertest1";
 

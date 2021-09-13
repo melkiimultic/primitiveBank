@@ -13,12 +13,15 @@ import java.math.BigDecimal;
 @Data
 @ApiModel("Перевод средств")
 public class MoneyTransferDTO {
+
     @ApiModelProperty("ID счета отправителя")
     private Long fromId;
+
     @NotNull
     @NotEmpty
     @ApiModelProperty("ID счета получателя")
     private Long toId;
+
     @NotNull
     @NotEmpty
     @ApiModelProperty("Сумма перевода")

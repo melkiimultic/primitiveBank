@@ -12,12 +12,13 @@ import java.math.BigDecimal;
 @Table(name = "accounts")
 @RequiredArgsConstructor
 public class Account {
+
     @Id
     @GeneratedValue()
     private Long id;
 
     @NotNull
-    @Column(name = "balance", columnDefinition="Decimal(10,2) default '0.00'" )
+    @Column(name = "balance", columnDefinition = "Decimal(10,2) default '0.00'")
     private BigDecimal balance = BigDecimal.ZERO;
 
     @ManyToOne(fetch = FetchType.EAGER)
