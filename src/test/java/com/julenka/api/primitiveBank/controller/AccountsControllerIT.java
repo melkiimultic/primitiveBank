@@ -7,10 +7,12 @@ import com.julenka.api.primitiveBank.domain.Roles;
 import com.julenka.api.primitiveBank.domain.User;
 import com.julenka.api.primitiveBank.domain.UserInfo;
 import com.julenka.api.primitiveBank.dto.AuthResponseDTO;
+import com.julenka.api.primitiveBank.dto.FundDepositDTO;
 import com.julenka.api.primitiveBank.repositories.AccountRepo;
 import com.julenka.api.primitiveBank.repositories.UserRepo;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,20 +63,21 @@ class AccountsControllerIT {
         return new ObjectMapper().readValue(loggedIn.getResponse().getContentAsString(), AuthResponseDTO.class);
     }
 
-    Long createAndSafeSimpleUser() {
+    Long createAndSafeSimpleUser(String name, String password, String firstname, String lastname) {
         User user = new User();
-        user.setUsername("test");
+        user.setUsername(name);
         user.setAuthorities(Set.of(Roles.USER));
-        user.setPassword(encoder.encode("test1"));
+        user.setPassword(encoder.encode(password));
         UserInfo info = new UserInfo();
-        info.setFirstName("First");
-        info.setLastName("Last");
+        info.setFirstName(firstname);
+        info.setLastName(lastname);
         user.setUserInfo(info);
         userRepo.save(user);
         return userRepo.findOneByUsername(user.getUsername()).get().getId();
     }
 
     @AfterEach
+    @BeforeEach
     @Transactional
     public void deleteUsers() {
         userRepo.deleteAll();
@@ -85,8 +88,7 @@ class AccountsControllerIT {
     @DisplayName("Create account for current user happy path")
     public void createAccountForCurrentUser() {
         template.executeWithoutResult(tr -> {
-            userRepo.deleteAll();
-            createAndSafeSimpleUser();
+            createAndSafeSimpleUser("test", "test1", "First", "Last");
         });
         final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/auth.json"));
         mockMvc.perform(post("/accounts/create")
@@ -95,11 +97,10 @@ class AccountsControllerIT {
 
         template.executeWithoutResult(tr -> {
             User test = userRepo.findOneByUsername("test").get();
-            Optional<Account> account = accounts.findAllByUser(test).get(0);
-            assertTrue(account.isPresent());
-            assertEquals(1, accounts.findAllByUser(test).size());
-            assertEquals(new BigDecimal("0.00"), account.get().getBalance());
-            assertEquals("test", account.get().getUser().getUsername());
+            Optional<Account> oneByUser = accounts.findOneByUser(test);
+            assertTrue(oneByUser.isPresent());
+            assertEquals(new BigDecimal("0.00"), oneByUser.get().getBalance());
+            assertEquals("test", oneByUser.get().getUser().getUsername());
         });
 
     }
@@ -109,8 +110,7 @@ class AccountsControllerIT {
     @DisplayName("Create account if header doesn't contain user")
     public void createAccountWithoutCurrentUser() {
         template.executeWithoutResult(tr -> {
-            userRepo.deleteAll();
-            createAndSafeSimpleUser();
+            createAndSafeSimpleUser("test", "test1", "First", "Last");
         });
         mockMvc.perform(post("/accounts/create"))
                 .andExpect(status().isUnauthorized());
@@ -119,6 +119,38 @@ class AccountsControllerIT {
             User test = userRepo.findOneByUsername("test").get();
             assertEquals(0, accounts.findAllByUser(test).size());
         });
+
+    }
+
+    @Test
+    @SneakyThrows
+    @DisplayName("Fund less than 0 sum")
+    public void fundNegativeSum() {
+        FundDepositDTO dto = new FundDepositDTO();
+        template.executeWithoutResult(tr -> {
+            Long userId = createAndSafeSimpleUser("test", "test1", "First", "Last");
+            User user = userRepo.getById(userId);
+            Account acc = new Account();
+            acc.setBalance(BigDecimal.ZERO);
+            acc.setUser(user);
+            Account account = accounts.saveAndFlush(acc);
+            dto.setAmount(new BigDecimal(-1000));
+            dto.setToId(account.getId());
+        });
+        final String loginRequest = ResourceConverter.getString(new ClassPathResource("test.requests/auth.json"));
+
+        mockMvc.perform(post("/accounts/fund")
+                .header("Authorization", "Bearer " + login(loginRequest).getJwtToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(new ObjectMapper().writeValueAsString(dto)))
+                .andExpect(status().isBadRequest());
+        template.executeWithoutResult(tr -> {
+            User user = userRepo.findOneByUsername("test").get();
+            Account account = accounts.findOneByUser(user).get();
+            assertEquals(0, account.getBalance().compareTo(BigDecimal.ZERO));
+            assertEquals("test", account.getUser().getUsername());
+        });
+
 
     }
 

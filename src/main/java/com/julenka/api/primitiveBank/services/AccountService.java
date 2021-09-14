@@ -39,26 +39,21 @@ public class AccountService {
             throw new BadRequestException("Empty request body");
         }
         checkAmountToFund(dto);
-
-        List<Account> accounts = currentUserService.getCurrentUser().getAccounts();
+        User user = currentUserService.getCurrentUser();
         if (dto.getToId() == null) {
-            if (accounts.size() != 1) {
+            try {
+                Account only = accountRepo.findOneByUser(user).orElseThrow();
+                dto.setToId(only.getId());
+            } catch (RuntimeException ex) {
                 throw new UncertainAccountException("User has no or more than 1 account");
-            } else {
-                dto.setToId(accounts.get(0).getId());
-            }
-        } else {
-            Optional<Long> first = accounts.stream()
-                    .map(Account::getId)
-                    .filter(aLong -> aLong.equals(dto.getToId()))
-                    .findFirst();
-            if (first.isEmpty()) {
-                throw new UncertainAccountException("Forbidden.Current user has not such an account");
             }
         }
-        Account account = accounts.get(0);
-        account.setBalance(account.getBalance().add(dto.getAmount()));
-        Account savedAcc = accountRepo.saveAndFlush(account);
+        Account toFund = accountRepo.fetchAccountWithLockById(dto.getToId())
+                .filter(acc -> acc.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new UncertainAccountException("Forbidden.User has not such an account"));
+
+        toFund.setBalance(toFund.getBalance().add(dto.getAmount()));
+        Account savedAcc = accountRepo.saveAndFlush(toFund);
         return savedAcc.getId();
     }
 
@@ -74,6 +69,9 @@ public class AccountService {
 
     @Transactional
     public void transferMoney(MoneyTransferDTO dto) {
+        if (dto == null) {
+            throw new BadRequestException("Empty request body");
+        }
         checkFromField(dto);
         checkToField(dto);
         checkAmount(dto);
@@ -81,25 +79,18 @@ public class AccountService {
     }
 
     private void checkFromField(MoneyTransferDTO dto) {
-        if (dto == null) {
-            throw new BadRequestException("Empty request body");
-        }
-        List<Account> accounts = currentUserService.getCurrentUser().getAccounts();
+        User user = currentUserService.getCurrentUser();
         if (dto.getFromId() == null) {
-            if (accounts.size() == 1) {
-                dto.setFromId(accounts.get(0).getId());
-            } else {
+            try {
+                Account only = accountRepo.findOneByUser(user).orElseThrow();
+                dto.setFromId(only.getId());
+            } catch (RuntimeException ex) {
                 throw new UncertainAccountException("User has no or more than 1 account");
             }
-        } else {
-            Optional<Long> first = accounts.stream()
-                    .map(Account::getId)
-                    .filter(aLong -> aLong.equals(dto.getFromId()))
-                    .findFirst();
-            if (first.isEmpty()) {
-                throw new UncertainAccountException("Forbidden.User has not such an account");
-            }
         }
+        accountRepo.findById(dto.getFromId())
+                .filter(acc -> acc.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new UncertainAccountException("Forbidden.User has not such an account"));
     }
 
     void checkToField(MoneyTransferDTO dto) {
@@ -116,23 +107,27 @@ public class AccountService {
         if (dto.getAmount() == null) {
             throw new ForbiddenOperationException("Request doesn't contain the amount");
         }
+
         if (dto.getAmount().compareTo(BigDecimal.ZERO) < 0) {
             throw new ForbiddenOperationException("You can't transfer negative amount");
         }
 
-        BigDecimal balance = accountRepo.findById(dto.getFromId()).get().getBalance();
-        if (balance.compareTo(dto.getAmount()) < 0) {
-            throw new ForbiddenOperationException("Not enough money for this operation");
-        }
+        accountRepo.findById(dto.getFromId()).ifPresent(acc -> {
+            BigDecimal balance = acc.getBalance();
+            if (balance.compareTo(dto.getAmount()) < 0) {
+                throw new ForbiddenOperationException("Not enough money for this operation");
+            }
+        });
     }
+
 
     private void actualTransfer(MoneyTransferDTO dto) {
         Long fromId = dto.getFromId();
         Long toId = dto.getToId();
         BigDecimal amount = dto.getAmount();
-        Account from = accountRepo.findById(fromId).get();
+        Account from = accountRepo.fetchAccountWithLockById(fromId).get();
         from.setBalance(from.getBalance().subtract(amount));
-        Account to = accountRepo.findById((toId)).get();
+        Account to = accountRepo.fetchAccountWithLockById((toId)).get();
         to.setBalance(to.getBalance().add(amount));
         accountRepo.saveAndFlush(from);
         accountRepo.saveAndFlush(to);
